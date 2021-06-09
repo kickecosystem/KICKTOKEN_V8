@@ -76,10 +76,12 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // ------------------------------------------------------------------------
     
     function setDistributionPercent(uint256 percent) external onlyRole(OWNER_ROLE) {
+        require(10 <= percent && percent <= 100); // 1% <= percent <= 10%
         _distributionPercent = percent;
     }
 
     function setBurnPercent(uint256 percent) external onlyRole(OWNER_ROLE) {
+        require(10 <= percent && percent <= 100); // 1% <= percent <= 10%
         _burnPercent = percent;
     }
 
@@ -165,14 +167,14 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     }
 
     function _getBurnValues(uint256 tAmount) private view returns (uint256, uint256) {
-        uint256 tBurnAmount = tAmount.div(100).mul(_burnPercent);
+        uint256 tBurnAmount = tAmount.div(1000).mul(_burnPercent);
         uint256 currentRate = _getRate();
         uint256 rBurnAmount = tBurnAmount.mul(currentRate);
         return (tBurnAmount, rBurnAmount);
     }
 
     function _getValues(uint256 tAmount) private view returns (uint256, uint256, uint256, uint256) {
-        uint256 tFee = tAmount.div(100).mul(_distributionPercent);
+        uint256 tFee = tAmount.div(1000).mul(_distributionPercent);
         uint256 tTransferAmount = tAmount.sub(tFee);
 
         uint256 currentRate =  _getRate();
@@ -184,7 +186,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     }
 
     function _getRate() private view returns(uint256) {
-        return _rTotal.div(_tTotal); // TODO что будет если _rTotal < _tTotal ???
+        return _rTotal.div(_tTotal);
     }
 
     function transferAll(address recipient) external returns (bool) {
@@ -192,6 +194,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         return true;
     }
 
+    // for initial token distribution (swap from old token)
     function multisend(address[] memory recipients, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
         require(recipients.length <= 200);
 
@@ -200,7 +203,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         uint256 currentRate = _getRate();
 
         uint8 i = 0;
-        for (i; i < recipients.length; i++) { // TODO важно ли сколько раз обновляю 1 переменную?
+        for (i; i < recipients.length; i++) {
             rAmount = tAmounts[i].mul(currentRate);
             rTotal += rAmount;
             _rOwned[recipients[i]] = _rOwned[recipients[i]].add(rAmount);           
