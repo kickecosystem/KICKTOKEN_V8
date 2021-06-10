@@ -11,19 +11,17 @@ import "erc-payable-token/contracts/token/ERC1363/ERC1363.sol";
 contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     using SafeMath for uint256;
 
-    mapping (address => uint256) private _rOwned; // reflection balance
-
-    // no burn and distribution if transfer to these addresses
-    mapping (address => bool) private _isExcluded;
-    address[] private _excluded;
-    
-    uint256 private _distributionPercent;
-    uint256 private _burnPercent;
-   
+    uint8   private _decimals;
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal; // token total
     uint256 private _rTotal; // reflection total
-    uint8   private _decimals;
+
+    mapping (address => uint256) private _rOwned; // reflection balance
+
+    // no burn and distribution if transfer to these addresses
+    mapping (address => bool) private _isNoIncomeFee;
+    uint256 private _distributionPercent;
+    uint256 private _burnPercent;
 
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -36,12 +34,17 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _;
     }
 
-    constructor(string memory name, string memory tiker, uint8 decimal, uint256 tTotal
-    ) ERC20(name, tiker) ERC20Permit(name) {
+    constructor(string memory name, string memory tiker, uint8 decimal, uint256 tTotal,
+    uint8 dPercent, uint8 bPercent) ERC20(name, tiker) ERC20Permit(name) {
         // init supply
         _decimals = decimal;
         _tTotal = tTotal * 10**decimal;
         _rTotal = (MAX - (MAX % _tTotal));
+
+        // set fee percents
+        require(10 <= dPercent && dPercent <= 100 && 10 <= bPercent && bPercent <= 100);
+        _distributionPercent = dPercent;
+        _burnPercent = bPercent;
 
         // set roles
         _setRoleAdmin(ADMIN_ROLE,OWNER_ROLE);
@@ -99,8 +102,9 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
             (uint256 rAmount,,,) = _getValues(tAmount);
             return rAmount;
         } else {
+            (,uint256 rBurnAmount) = _getBurnValues(tAmount);
             (,uint256 rTransferAmount,,) = _getValues(tAmount);
-            return rTransferAmount;
+            return rTransferAmount.sub(rBurnAmount);
         }
     }
 
@@ -110,34 +114,26 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         return rAmount.div(currentRate);
     }
 
-    function isExcluded(address account) public view returns (bool) {
-        return _isExcluded[account];
+    function isNoIncomeFee(address account) public view returns (bool) {
+        return _isNoIncomeFee[account];
     }
 
-    function excludeAccount(address account) external onlyRole(ADMIN_ROLE) {
-        require(!_isExcluded[account], "Account is already excluded");
-        _isExcluded[account] = true;
-        _excluded.push(account);
+    function grantNoIncomeFee(address account) external onlyRole(ADMIN_ROLE) {
+        require(!_isNoIncomeFee[account], "Account is already no income fee");
+        _isNoIncomeFee[account] = true;
     }
 
-    function includeAccount(address account) external onlyRole(ADMIN_ROLE) {
-        require(_isExcluded[account], "Account is already included");
-        for (uint256 i = 0; i < _excluded.length; i++) {
-            if (_excluded[i] == account) {
-                _excluded[i] = _excluded[_excluded.length - 1];
-                _isExcluded[account] = false;
-                _excluded.pop();
-                break;
-            }
-        }
+    function revokeNoIncomeFee(address account) external onlyRole(ADMIN_ROLE) {
+        require(_isNoIncomeFee[account], "Account is not no income fee");
+        _isNoIncomeFee[account] = false;
     }
 
-    function _transfer(address sender, address recipient, uint256 amount) internal notPaused override {
+    function _transfer(address sender, address recipient, uint256 amount) internal override(ERC20) notPaused {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
             
-        if (_isExcluded[recipient]) {
-            _transferToExcluded(sender, recipient, amount);
+        if (_isNoIncomeFee[recipient]) {
+            _transferWithoutFee(sender, recipient, amount);
         } else {
             _transferStandard(sender, recipient, amount);
         }
@@ -150,15 +146,15 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
         (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount) = _getValues(tAmount);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount - rBurnAmount);       
+        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount.sub(rBurnAmount));       
 
         // destribute fee
         _rTotal = _rTotal.sub(rFee);
 
-        emit Transfer(sender, recipient, tTransferAmount - tBurnAmount);
+        emit Transfer(sender, recipient, tTransferAmount.sub(tBurnAmount));
     }
 
-    function _transferToExcluded(address sender, address recipient, uint256 tAmount) private {
+    function _transferWithoutFee(address sender, address recipient, uint256 tAmount) private {
         uint256 currentRate = _getRate();
         uint256 rAmount = tAmount.mul(currentRate);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
@@ -196,7 +192,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
     // for initial token distribution (swap from old token)
     function multisend(address[] memory recipients, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
-        require(recipients.length <= 200);
+        require(recipients.length <= 200, "More than 200 recipients");
 
         uint256 rTotal;
         uint256 rAmount;
@@ -239,8 +235,8 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _burn(account, tAmount);
     }
 
-    function burnBatchAdmin(address[] memory accounts, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
-        require(accounts.length <= 200);
+    function burnBatch(address[] memory accounts, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
+        require(accounts.length <= 200, "More than 200 accounts");
 
         uint8 i = 0;
         for (i; i < accounts.length; i++) {
@@ -268,8 +264,8 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _distribute(account, tAmount);
     }
 
-    function distributeBatchAdmin(address[] memory accounts, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
-        require(accounts.length <= 200);
+    function distributeBatch(address[] memory accounts, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
+        require(accounts.length <= 200, "More than 200 accounts");
 
         uint8 i = 0;
         for (i; i < accounts.length; i++) {
