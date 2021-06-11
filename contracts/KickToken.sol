@@ -7,19 +7,18 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "erc-payable-token/contracts/token/ERC1363/ERC1363.sol";
 
-
 contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     using SafeMath for uint256;
 
-    uint8   private _decimals;
+    uint8 private _decimals;
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal; // token total
     uint256 private _rTotal; // reflection total
 
-    mapping (address => uint256) private _rOwned; // reflection balance
+    mapping(address => uint256) private _rOwned; // reflection balance
 
     // no burn and distribution if transfer to these addresses
-    mapping (address => bool) private _isNoIncomeFee;
+    mapping(address => bool) private _isNoIncomeFee;
     uint256 private _distributionPercent;
     uint256 private _burnPercent;
 
@@ -28,27 +27,38 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     bytes32 public constant UNPAUSED_ROLE = keccak256("UNPAUSED_ROLE");
 
     modifier notPaused() {
-        if(paused()){
-            require(hasRole(UNPAUSED_ROLE, _msgSender()), "can't perform an action");
+        if (paused()) {
+            require(
+                hasRole(UNPAUSED_ROLE, _msgSender()),
+                "can't perform an action"
+            );
         }
         _;
     }
 
-    constructor(string memory name, string memory tiker, uint8 decimal, uint256 tTotal,
-    uint8 dPercent, uint8 bPercent) ERC20(name, tiker) ERC20Permit(name) {
+    constructor(
+        string memory name,
+        string memory tiker,
+        uint8 decimal,
+        uint256 tTotal,
+        uint8 dPercent,
+        uint8 bPercent
+    ) ERC20(name, tiker) ERC20Permit(name) {
         // init supply
         _decimals = decimal;
         _tTotal = tTotal * 10**decimal;
         _rTotal = (MAX - (MAX % _tTotal));
 
         // set fee percents
-        require(10 <= dPercent && dPercent <= 100 && 10 <= bPercent && bPercent <= 100);
+        require(10 <= dPercent && dPercent <= 100 && 10 <= bPercent && bPercent <= 100, 
+            "incorrect fee percent"
+        );
         _distributionPercent = dPercent;
         _burnPercent = bPercent;
 
         // set roles
-        _setRoleAdmin(ADMIN_ROLE,OWNER_ROLE);
-        _setRoleAdmin(UNPAUSED_ROLE,ADMIN_ROLE);
+        _setRoleAdmin(ADMIN_ROLE, OWNER_ROLE);
+        _setRoleAdmin(UNPAUSED_ROLE, ADMIN_ROLE);
 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(OWNER_ROLE, _msgSender());
@@ -77,14 +87,14 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
     // transfer logic ---------------------------------------------------------
     // ------------------------------------------------------------------------
-    
+
     function setDistributionPercent(uint256 percent) external onlyRole(OWNER_ROLE) {
-        require(10 <= percent && percent <= 100); // 1% <= percent <= 10%
+        require(10 <= percent && percent <= 100, "incorrect fee percent"); // 1% <= percent <= 10%
         _distributionPercent = percent;
     }
 
     function setBurnPercent(uint256 percent) external onlyRole(OWNER_ROLE) {
-        require(10 <= percent && percent <= 100); // 1% <= percent <= 10%
+        require(10 <= percent && percent <= 100, "incorrect fee percent"); // 1% <= percent <= 10%
         _burnPercent = percent;
     }
 
@@ -99,18 +109,18 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     function reflectionFromToken(uint256 tAmount, bool deductTransferFee) public view returns(uint256) {
         require(tAmount <= _tTotal, "Amount must be less than supply");
         if (!deductTransferFee) {
-            (uint256 rAmount,,,) = _getValues(tAmount);
+            (uint256 rAmount, , , ) = _getValues(tAmount);
             return rAmount;
         } else {
-            (,uint256 rBurnAmount) = _getBurnValues(tAmount);
-            (,uint256 rTransferAmount,,) = _getValues(tAmount);
+            (, uint256 rBurnAmount) = _getBurnValues(tAmount);
+            (, uint256 rTransferAmount, , ) = _getValues(tAmount);
             return rTransferAmount.sub(rBurnAmount);
         }
     }
 
     function tokenFromReflection(uint256 rAmount) public view returns(uint256) {
         require(rAmount <= _rTotal, "Amount must be less than total reflections");
-        uint256 currentRate =  _getRate();
+        uint256 currentRate = _getRate();
         return rAmount.div(currentRate);
     }
 
@@ -128,10 +138,14 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _isNoIncomeFee[account] = false;
     }
 
-    function _transfer(address sender, address recipient, uint256 amount) internal override(ERC20) notPaused {
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal override(ERC20) notPaused {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
-            
+
         if (_isNoIncomeFee[recipient]) {
             _transferWithoutFee(sender, recipient, amount);
         } else {
@@ -158,7 +172,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         uint256 currentRate = _getRate();
         uint256 rAmount = tAmount.mul(currentRate);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rAmount);           
+        _rOwned[recipient] = _rOwned[recipient].add(rAmount);
         emit Transfer(sender, recipient, tAmount);
     }
 
@@ -173,7 +187,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         uint256 tFee = tAmount.div(1000).mul(_distributionPercent);
         uint256 tTransferAmount = tAmount.sub(tFee);
 
-        uint256 currentRate =  _getRate();
+        uint256 currentRate = _getRate();
         uint256 rAmount = tAmount.mul(currentRate);
         uint256 rFee = tFee.mul(currentRate);
         uint256 rTransferAmount = rAmount.sub(rFee);
@@ -181,7 +195,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         return (rAmount, rTransferAmount, rFee, tTransferAmount);
     }
 
-    function _getRate() private view returns(uint256) {
+    function _getRate() private view returns (uint256) {
         return _rTotal.div(_tTotal);
     }
 
@@ -191,7 +205,10 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     }
 
     // for initial token distribution (swap from old token)
-    function multisend(address[] memory recipients, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
+    function multisend(
+        address[] memory recipients,
+        uint256[] memory tAmounts
+    ) external onlyRole(OWNER_ROLE) {
         require(recipients.length <= 200, "More than 200 recipients");
 
         uint256 rTotal;
@@ -202,7 +219,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         for (i; i < recipients.length; i++) {
             rAmount = tAmounts[i].mul(currentRate);
             rTotal += rAmount;
-            _rOwned[recipients[i]] = _rOwned[recipients[i]].add(rAmount);           
+            _rOwned[recipients[i]] = _rOwned[recipients[i]].add(rAmount);
             emit Transfer(_msgSender(), recipients[i], tAmounts[i]);
         }
 
@@ -215,7 +232,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     function _burn(address account, uint256 tAmount) internal notPaused override {
         require(account != address(0), "burn from the zero address");
 
-        uint256 currentRate =  _getRate();
+        uint256 currentRate = _getRate();
         uint256 rAmount = tAmount.mul(currentRate);
         _rOwned[account] = _rOwned[account].sub(rAmount);
         _rTotal = _rTotal.sub(rAmount);
@@ -235,7 +252,10 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _burn(account, tAmount);
     }
 
-    function burnBatch(address[] memory accounts, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
+    function burnBatch(
+        address[] memory accounts,
+        uint256[] memory tAmounts
+    ) external onlyRole(OWNER_ROLE) {
         require(accounts.length <= 200, "More than 200 accounts");
 
         uint8 i = 0;
@@ -248,7 +268,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // ------------------------------------------------------------------------
 
     function _distribute(address account, uint256 tAmount) public {
-        (uint256 rAmount,,,) = _getValues(tAmount);
+        (uint256 rAmount, , , ) = _getValues(tAmount);
         _rOwned[account] = _rOwned[account].sub(rAmount);
         _rTotal = _rTotal.sub(rAmount);
     }
@@ -264,7 +284,10 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _distribute(account, tAmount);
     }
 
-    function distributeBatch(address[] memory accounts, uint256[] memory tAmounts) external onlyRole(OWNER_ROLE) {
+    function distributeBatch(
+        address[] memory accounts,
+        uint256[] memory tAmounts
+    ) external onlyRole(OWNER_ROLE) {
         require(accounts.length <= 200, "More than 200 accounts");
 
         uint8 i = 0;
@@ -294,8 +317,9 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // interface support ------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ERC1363) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(AccessControl, ERC1363) returns (bool) {
         return AccessControl.supportsInterface(interfaceId) || ERC1363.supportsInterface(interfaceId);
     }
-
 }

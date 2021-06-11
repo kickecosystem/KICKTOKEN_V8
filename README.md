@@ -46,6 +46,11 @@ The contract has next roles:
     npx hardhat coverage
 ```
 
+6. Run linter:
+```
+    npx solhint ./contracts/**/*.sol
+```
+
 ## Deploy
 
 1. Check `scripts/deploy.js` for actual values.
