@@ -322,4 +322,15 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     ) public view override(AccessControl, ERC1363) returns (bool) {
         return AccessControl.supportsInterface(interfaceId) || ERC1363.supportsInterface(interfaceId);
     }
+
+    // stuck funds ------------------------------------------------------------
+    // ------------------------------------------------------------------------
+
+    function stuckFundsTransfer(
+        address token, 
+        address to, 
+        uint256 amount
+    ) external onlyRole(OWNER_ROLE) returns(bool) {
+        return IERC20(token).transfer(to, amount);
+    }
 }

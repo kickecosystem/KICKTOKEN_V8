@@ -697,4 +697,39 @@ describe("Token contract", function () {
       expect(await kickToken.totalSupply()).to.equal(initialTotalSupply);
     });
   });
+
+  describe("Stuck funds", function () {
+    it("Should transfer stuck funds from owner", async function () {
+      tokenERC20 = await Token.deploy("ERC20", "ERC20", 9, 1.5 * 10**9, 10, 10);
+      
+      expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(0);
+
+      await tokenERC20.transfer(kickToken.address, 100);
+
+      expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(100);
+      expect(await tokenERC20.balanceOf(addr1.address)).to.equal(0);
+
+      await kickToken.stuckFundsTransfer(tokenERC20.address, addr1.address, 100)
+
+      expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(0);
+      expect(await tokenERC20.balanceOf(addr1.address)).to.equal(100);
+    });
+
+    it("Should fail transfer stuck funds from not owner", async function () {
+      tokenERC20 = await Token.deploy("ERC20", "ERC20", 9, 1.5 * 10**9, 10, 10);
+      
+      expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(0);
+
+      await tokenERC20.transfer(kickToken.address, 100);
+
+      expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(100);
+      expect(await tokenERC20.balanceOf(addr1.address)).to.equal(0);
+
+      await expect(kickToken.connect(addr1).stuckFundsTransfer(
+        tokenERC20.address, addr1.address, 100)).to.be.reverted;
+
+      expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(100);
+      expect(await tokenERC20.balanceOf(addr1.address)).to.equal(0);
+    });
+  });
 });
