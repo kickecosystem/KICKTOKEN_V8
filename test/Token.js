@@ -15,7 +15,7 @@ describe("Token contract", function () {
     Token = await ethers.getContractFactory("KickToken");
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-    kickToken = await Token.deploy("KickToken", "KICK", 9, 1.5 * 10**9, 50, 50);
+    kickToken = await Token.deploy("KickToken", "KICK", 10, 1.5 * 10**9, 50, 50);
   });
 
   describe("Deployment", function () {
@@ -34,7 +34,7 @@ describe("Token contract", function () {
 
     it("Should set the right total supply of tokens", async function () {
       var totalSupply = await kickToken.totalSupply()
-      var expected = 1.5 * 10**9 * 10**9
+      var expected = 1.5 * 10**10 * 10**9
       expect(totalSupply.toString()).to.equals(expected.toString());
     });
 
@@ -49,7 +49,7 @@ describe("Token contract", function () {
     });
 
     it("Should set the right decimals", async function () {
-      expect(await kickToken.decimals()).to.equal(9);
+      expect(await kickToken.decimals()).to.equal(10);
     });
 
     it("Should set the right name of token", async function () {
