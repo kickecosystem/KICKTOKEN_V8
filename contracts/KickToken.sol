@@ -26,6 +26,11 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant UNPAUSED_ROLE = keccak256("UNPAUSED_ROLE");
 
+    event DistributionPercentChanged(uint256 value);
+    event BurnPercentChanged(uint256 value);
+    event NoIncomeFeeRoleGranted(address indexed account);
+    event NoIncomeFeeRoleRevoked(address indexed account);
+
     modifier notPaused() {
         if (paused()) {
             require(
@@ -54,7 +59,9 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
             "incorrect fee percent"
         );
         _distributionPercent = dPercent;
+        emit DistributionPercentChanged(dPercent);
         _burnPercent = bPercent;
+        emit BurnPercentChanged(bPercent);
 
         // set roles
         _setRoleAdmin(ADMIN_ROLE, OWNER_ROLE);
@@ -91,11 +98,13 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     function setDistributionPercent(uint256 percent) external onlyRole(OWNER_ROLE) {
         require(10 <= percent && percent <= 100, "incorrect fee percent"); // 1% <= percent <= 10%
         _distributionPercent = percent;
+        emit DistributionPercentChanged(percent);
     }
 
     function setBurnPercent(uint256 percent) external onlyRole(OWNER_ROLE) {
         require(10 <= percent && percent <= 100, "incorrect fee percent"); // 1% <= percent <= 10%
         _burnPercent = percent;
+        emit BurnPercentChanged(percent);
     }
 
     function distributionPercent() public view returns (uint256) {
@@ -131,11 +140,13 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     function grantNoIncomeFee(address account) external onlyRole(ADMIN_ROLE) {
         require(!_isNoIncomeFee[account], "Account is already no income fee");
         _isNoIncomeFee[account] = true;
+        emit NoIncomeFeeRoleGranted(account);
     }
 
     function revokeNoIncomeFee(address account) external onlyRole(ADMIN_ROLE) {
         require(_isNoIncomeFee[account], "Account is not no income fee");
         _isNoIncomeFee[account] = false;
+        emit NoIncomeFeeRoleRevoked(account);
     }
 
     function _transfer(
@@ -327,10 +338,10 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // ------------------------------------------------------------------------
 
     function stuckFundsTransfer(
-        address token, 
-        address to, 
+        address token,
+        address to,
         uint256 amount
-    ) external onlyRole(OWNER_ROLE) returns(bool) {
+    ) external onlyRole(OWNER_ROLE) returns (bool) {
         return IERC20(token).transfer(to, amount);
     }
 }
