@@ -11,7 +11,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     using SafeMath for uint256;
 
     uint8 private _decimals;
-    uint256 private constant MAX = ~uint256(0);
+    uint256 private constant MAX = type(uint256).max;
     uint256 private _tTotal; // token total
     uint256 private _rTotal; // reflection total
 
@@ -30,6 +30,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     event BurnPercentChanged(uint256 value);
     event NoIncomeFeeRoleGranted(address indexed account);
     event NoIncomeFeeRoleRevoked(address indexed account);
+    event Distribution(address indexed account, uint256 value);
 
     modifier notPaused() {
         if (paused()) {
@@ -43,12 +44,12 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
     constructor(
         string memory name,
-        string memory tiker,
+        string memory ticker,
         uint8 decimal,
         uint256 tTotal,
-        uint8 dPercent,
-        uint8 bPercent
-    ) ERC20(name, tiker) ERC20Permit(name) {
+        uint256 dPercent,
+        uint256 bPercent
+    ) ERC20(name, ticker) ERC20Permit(name) {
         // init supply
         _decimals = decimal;
         _tTotal = tTotal * 10**decimal;
@@ -107,15 +108,15 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         emit BurnPercentChanged(percent);
     }
 
-    function distributionPercent() public view returns (uint256) {
+    function distributionPercent() external view returns (uint256) {
         return _distributionPercent;
     }
 
-    function burnPercent() public view returns (uint256) {
+    function burnPercent() external view returns (uint256) {
         return _burnPercent;
     }
 
-    function reflectionFromToken(uint256 tAmount, bool deductTransferFee) public view returns(uint256) {
+    function reflectionFromToken(uint256 tAmount, bool deductTransferFee) external view returns(uint256) {
         require(tAmount <= _tTotal, "Amount must be less than supply");
         if (!deductTransferFee) {
             (uint256 rAmount, , , ) = _getValues(tAmount);
@@ -133,7 +134,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         return rAmount.div(currentRate);
     }
 
-    function isNoIncomeFee(address account) public view returns (bool) {
+    function isNoIncomeFee(address account) external view returns (bool) {
         return _isNoIncomeFee[account];
     }
 
@@ -173,7 +174,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
         _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount.sub(rBurnAmount));       
 
-        // destribute fee
+        // distribute fee
         _rTotal = _rTotal.sub(rFee);
 
         emit Transfer(sender, recipient, tTransferAmount.sub(tBurnAmount));
@@ -188,14 +189,14 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     }
 
     function _getBurnValues(uint256 tAmount) private view returns (uint256, uint256) {
-        uint256 tBurnAmount = tAmount.div(1000).mul(_burnPercent);
+        uint256 tBurnAmount = tAmount.mul(_burnPercent).div(1000);
         uint256 currentRate = _getRate();
         uint256 rBurnAmount = tBurnAmount.mul(currentRate);
         return (tBurnAmount, rBurnAmount);
     }
 
     function _getValues(uint256 tAmount) private view returns (uint256, uint256, uint256, uint256) {
-        uint256 tFee = tAmount.div(1000).mul(_distributionPercent);
+        uint256 tFee = tAmount.mul(_distributionPercent).div(1000);
         uint256 tTransferAmount = tAmount.sub(tFee);
 
         uint256 currentRate = _getRate();
@@ -278,17 +279,18 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // distribute logic -------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    function _distribute(address account, uint256 tAmount) public {
+    function _distribute(address account, uint256 tAmount) internal {
         (uint256 rAmount, , , ) = _getValues(tAmount);
         _rOwned[account] = _rOwned[account].sub(rAmount);
         _rTotal = _rTotal.sub(rAmount);
+        emit Distribution(account, tAmount);
     }
 
-    function distribute(uint256 tAmount) public {
+    function distribute(uint256 tAmount) external {
         _distribute(_msgSender(), tAmount);
     }
 
-    function distributeFrom(address account, uint256 tAmount) public {
+    function distributeFrom(address account, uint256 tAmount) external {
         uint256 currentAllowance = allowance(account, _msgSender());
         require(currentAllowance >= tAmount, "distribute amount exceeds allowance");
         _approve(account, _msgSender(), currentAllowance - tAmount);
@@ -317,7 +319,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // pause logic ------------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    function pauseTrigger() public onlyRole(OWNER_ROLE) {
+    function pauseTrigger() external onlyRole(OWNER_ROLE) {
         if (paused()) {
             _unpause();
         } else {
