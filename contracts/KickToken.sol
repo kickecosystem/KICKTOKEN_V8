@@ -216,6 +216,15 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         return true;
     }
 
+    function transferAllFrom(address account, address recipient) external returns (bool) {
+        uint256 tAmount = tokenFromReflection(_rOwned[account]);
+        uint256 currentAllowance = allowance(account, _msgSender());
+        require(currentAllowance >= tAmount, "transfer amount exceeds allowance");
+        _approve(account, _msgSender(), currentAllowance - tAmount);
+        _transfer(account, recipient, tAmount);
+        return true;
+    }
+
     // for initial token distribution (swap from old token)
     function multisend(
         address[] memory recipients,

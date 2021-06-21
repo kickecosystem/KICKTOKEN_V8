@@ -229,6 +229,39 @@ describe("Token contract", function () {
       expect(finalSupply).to.equal(initialTotalSupply.sub(190));
     });
 
+    it("Should transfer all tokens from", async function () {
+      const initialOwnerBalance = await kickToken.balanceOf(owner.address);
+      var initialTotalSupply = await kickToken.totalSupply()
+
+      await kickToken.transfer(addr1.address, 2000);
+      
+      const addr1Balance = await kickToken.balanceOf(addr1.address);
+      expect(addr1Balance).to.equal(1800);
+      const ownerBalance = await kickToken.balanceOf(owner.address);
+      expect(ownerBalance).to.equal(initialOwnerBalance.sub(1901));  // rounding  issue
+      var totalSupply = await kickToken.totalSupply()
+      expect(totalSupply).to.equal(initialTotalSupply.sub(100));
+
+      const initailAddr2Balance = await kickToken.balanceOf(addr2.address);
+      expect(initailAddr2Balance).to.equal(0);
+
+      expect(await kickToken.allowance(addr1.address, owner.address)).to.equal(0);
+      await kickToken.connect(addr1).approve(owner.address, 3000);
+      expect(await kickToken.allowance(addr1.address, owner.address)).to.equal(3000);
+
+      await kickToken.transferAllFrom(addr1.address, addr2.address);
+
+      expect(await kickToken.allowance(addr1.address, owner.address)).to.equal(1200);
+      const finalAddr1Balance = await kickToken.balanceOf(addr1.address);
+      expect(finalAddr1Balance).to.equal(0);
+      const finalAddr2Balance = await kickToken.balanceOf(addr2.address);
+      expect(finalAddr2Balance).to.equal(1620);
+      const finalOwnerBalance = await kickToken.balanceOf(owner.address);
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1811));  // rounding  issue
+      var finalSupply = await kickToken.totalSupply()
+      expect(finalSupply).to.equal(initialTotalSupply.sub(190));
+    });
+
     it("reflectionFromToken-tokenFromReflection metods should work", async function () {
       const balance = await kickToken.balanceOf(owner.address);
       const reflection = await kickToken.reflectionFromToken(balance,false);
