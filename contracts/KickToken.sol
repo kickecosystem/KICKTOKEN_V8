@@ -178,6 +178,8 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _rTotal = _rTotal.sub(rFee);
 
         emit Transfer(sender, recipient, tTransferAmount.sub(tBurnAmount));
+        emit Transfer(sender, address(0), tBurnAmount);
+        emit Distribution(sender, tAmount.sub(tTransferAmount));
     }
 
     function _transferWithoutFee(address sender, address recipient, uint256 tAmount) private {
