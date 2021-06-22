@@ -3,15 +3,11 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "erc-payable-token/contracts/token/ERC1363/ERC1363.sol";
 
 contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
-    using SafeMath for uint256;
-
     uint8 private _decimals;
-    uint256 private constant MAX = type(uint256).max;
     uint256 private _tTotal; // token total
     uint256 private _rTotal; // reflection total
 
@@ -53,7 +49,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         // init supply
         _decimals = decimal;
         _tTotal = tTotal * 10**decimal;
-        _rTotal = (MAX - (MAX % _tTotal));
+        _rTotal = (type(uint256).max - (type(uint256).max % _tTotal));
 
         // set fee percents
         require(10 <= dPercent && dPercent <= 100 && 10 <= bPercent && bPercent <= 100, 
@@ -124,14 +120,14 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         } else {
             (, uint256 rBurnAmount) = _getBurnValues(tAmount);
             (, uint256 rTransferAmount, , ) = _getValues(tAmount);
-            return rTransferAmount.sub(rBurnAmount);
+            return rTransferAmount - rBurnAmount;
         }
     }
 
     function tokenFromReflection(uint256 rAmount) public view returns(uint256) {
         require(rAmount <= _rTotal, "Amount must be less than total reflections");
         uint256 currentRate = _getRate();
-        return rAmount.div(currentRate);
+        return rAmount / currentRate;
     }
 
     function isNoIncomeFee(address account) external view returns (bool) {
@@ -167,50 +163,50 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
     function _transferStandard(address sender, address recipient, uint256 tAmount) private {
         (uint256 tBurnAmount, uint256 rBurnAmount) = _getBurnValues(tAmount);
-        _tTotal = _tTotal.sub(tBurnAmount);
-        _rTotal = _rTotal.sub(rBurnAmount);
+        _tTotal -= tBurnAmount;
+        _rTotal -= rBurnAmount;
 
         (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount) = _getValues(tAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount.sub(rBurnAmount));       
+        _rOwned[sender] -= rAmount;
+        _rOwned[recipient] += rTransferAmount - rBurnAmount;
 
         // distribute fee
-        _rTotal = _rTotal.sub(rFee);
+        _rTotal -= rFee;
 
-        emit Transfer(sender, recipient, tTransferAmount.sub(tBurnAmount));
+        emit Transfer(sender, recipient, tTransferAmount - tBurnAmount);
         emit Transfer(sender, address(0), tBurnAmount);
-        emit Distribution(sender, tAmount.sub(tTransferAmount));
+        emit Distribution(sender, tAmount - tTransferAmount);
     }
 
     function _transferWithoutFee(address sender, address recipient, uint256 tAmount) private {
         uint256 currentRate = _getRate();
-        uint256 rAmount = tAmount.mul(currentRate);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rAmount);
+        uint256 rAmount = tAmount * currentRate;
+        _rOwned[sender] -= rAmount;
+        _rOwned[recipient] += rAmount;
         emit Transfer(sender, recipient, tAmount);
     }
 
     function _getBurnValues(uint256 tAmount) private view returns (uint256, uint256) {
-        uint256 tBurnAmount = tAmount.mul(_burnPercent).div(1000);
+        uint256 tBurnAmount = (tAmount * _burnPercent) / 1000;
         uint256 currentRate = _getRate();
-        uint256 rBurnAmount = tBurnAmount.mul(currentRate);
+        uint256 rBurnAmount = tBurnAmount * currentRate;
         return (tBurnAmount, rBurnAmount);
     }
 
     function _getValues(uint256 tAmount) private view returns (uint256, uint256, uint256, uint256) {
-        uint256 tFee = tAmount.mul(_distributionPercent).div(1000);
-        uint256 tTransferAmount = tAmount.sub(tFee);
+        uint256 tFee = (tAmount * _distributionPercent) / 1000;
+        uint256 tTransferAmount = tAmount - tFee;
 
         uint256 currentRate = _getRate();
-        uint256 rAmount = tAmount.mul(currentRate);
-        uint256 rFee = tFee.mul(currentRate);
-        uint256 rTransferAmount = rAmount.sub(rFee);
+        uint256 rAmount = tAmount * currentRate;
+        uint256 rFee = tFee * currentRate;
+        uint256 rTransferAmount = rAmount - rFee;
 
         return (rAmount, rTransferAmount, rFee, tTransferAmount);
     }
 
     function _getRate() private view returns (uint256) {
-        return _rTotal.div(_tTotal);
+        return _rTotal / _tTotal;
     }
 
     function transferAll(address recipient) external returns (bool) {
@@ -240,13 +236,13 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
         uint8 i = 0;
         for (i; i < recipients.length; i++) {
-            rAmount = tAmounts[i].mul(currentRate);
+            rAmount = tAmounts[i] * currentRate;
             rTotal += rAmount;
-            _rOwned[recipients[i]] = _rOwned[recipients[i]].add(rAmount);
+            _rOwned[recipients[i]] += rAmount;
             emit Transfer(_msgSender(), recipients[i], tAmounts[i]);
         }
 
-        _rOwned[_msgSender()] = _rOwned[_msgSender()].sub(rTotal);
+        _rOwned[_msgSender()] -= rTotal;
     }
 
     // burn logic -------------------------------------------------------------
@@ -256,10 +252,10 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         require(account != address(0), "burn from the zero address");
 
         uint256 currentRate = _getRate();
-        uint256 rAmount = tAmount.mul(currentRate);
-        _rOwned[account] = _rOwned[account].sub(rAmount);
-        _rTotal = _rTotal.sub(rAmount);
-        _tTotal = _tTotal.sub(tAmount);
+        uint256 rAmount = tAmount * currentRate;
+        _rOwned[account] -= rAmount;
+        _rTotal -= rAmount;
+        _tTotal -= tAmount;
 
         emit Transfer(account, address(0), tAmount);
     }
@@ -292,8 +288,8 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
 
     function _distribute(address account, uint256 tAmount) internal {
         (uint256 rAmount, , , ) = _getValues(tAmount);
-        _rOwned[account] = _rOwned[account].sub(rAmount);
-        _rTotal = _rTotal.sub(rAmount);
+        _rOwned[account] -= rAmount;
+        _rTotal -= rAmount;
         emit Distribution(account, tAmount);
     }
 
@@ -324,7 +320,7 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
     // ------------------------------------------------------------------------
 
     function denominate(uint256 rate) external onlyRole(OWNER_ROLE) {
-        _tTotal = _tTotal.div(rate);
+        _tTotal /= rate;
     }
 
     // pause logic ------------------------------------------------------------
