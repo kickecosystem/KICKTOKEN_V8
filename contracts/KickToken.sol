@@ -271,18 +271,6 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         _burn(account, tAmount);
     }
 
-    function burnBatch(
-        address[] memory accounts,
-        uint256[] memory tAmounts
-    ) external onlyRole(OWNER_ROLE) {
-        require(accounts.length <= 200, "More than 200 accounts");
-
-        uint8 i = 0;
-        for (i; i < accounts.length; i++) {
-            _burn(accounts[i], tAmounts[i]);
-        }
-    }
-
     // distribute logic -------------------------------------------------------
     // ------------------------------------------------------------------------
 
@@ -302,18 +290,6 @@ contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
         require(currentAllowance >= tAmount, "distribute amount exceeds allowance");
         _approve(account, _msgSender(), currentAllowance - tAmount);
         _distribute(account, tAmount);
-    }
-
-    function distributeBatch(
-        address[] memory accounts,
-        uint256[] memory tAmounts
-    ) external onlyRole(OWNER_ROLE) {
-        require(accounts.length <= 200, "More than 200 accounts");
-
-        uint8 i = 0;
-        for (i; i < accounts.length; i++) {
-            _distribute(accounts[i], tAmounts[i]);
-        }
     }
 
     // denomination logic -----------------------------------------------------
