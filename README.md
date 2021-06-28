@@ -59,4 +59,9 @@ Contract has the following roles:
 ```
     npx hardhat run scripts/deploy.js --network <network-name>
 ```
+
+3. Verify on Etherscan:
+```
+    npx hardhat verify --network <network-name> <contract-address> <constructor-arguments>
+```
  
