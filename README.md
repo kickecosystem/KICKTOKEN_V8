@@ -1,5 +1,7 @@
 # KickToken contracts v8
 
+The ETH [mainnet](https://etherscan.io/address/0x824a50dF33AC1B41Afc52f4194E2e8356C17C3aC)/[rinkeby](https://rinkeby.etherscan.io/address/0x824a50dF33AC1B41Afc52f4194E2e8356C17C3aC) address is 0x824a50dF33AC1B41Afc52f4194E2e8356C17C3aC.
+
 Token supports public interfaces:
 1. [IERC20](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol) from OpenZeppelin.
 2. Burnable - users can burn their own tokens.
