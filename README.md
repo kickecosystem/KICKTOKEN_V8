@@ -16,9 +16,7 @@ Contract implements the following custom logic:
 
 Token has following custom owner logic:
 1. `multisend` - allows the contract owner to transfer tokens to a batch of accounts without burning and distribution fee. It will be used for initial token swap and potential future token airdrops.
-2. `burnBatch` - allows the contract owner to burn tokens from a batch of accounts without their allowance. It will be used in case of token thefts or emergencies.
-3. `disributeBatch` - allows the contract owner to distribute tokens from a batch of accounts without their allowance. It will be used in case of token thefts or emergencies.
-4. `denominate` - allows token denomination.
+2. `denominate` - allows token denomination.
 
 Contract has the following roles:
 1. `OWNER_ROLE` - this role can do all of the above and grant/revoke `ADMIN_ROLE`.
