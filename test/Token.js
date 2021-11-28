@@ -12,7 +12,7 @@ describe("Token contract", function () {
   let addrs;
 
   beforeEach(async function () {
-    Token = await ethers.getContractFactory("KickToken");
+    Token = await ethers.getContractFactory("Token");
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
     kickToken = await Token.deploy("KickToken", "KICK", 10, 1.5 * 10**9, 50, 50);

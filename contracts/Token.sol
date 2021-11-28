@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "erc-payable-token/contracts/token/ERC1363/ERC1363.sol";
 
-contract KickToken is ERC1363, ERC20Permit, Pausable, AccessControl {
+contract Token is ERC1363, ERC20Permit, Pausable, AccessControl {
     uint8 private _decimals;
     uint256 private _tTotal; // token total
     uint256 private _rTotal; // reflection total

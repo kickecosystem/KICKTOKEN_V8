@@ -9,7 +9,7 @@ async function main() {
 
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
-    const Token = await ethers.getContractFactory("KickToken");
+    const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy("KickToken", "KICK", 10, 1.5 * 10**9, 50, 50);
 
     console.log("Token address:", token.address);
