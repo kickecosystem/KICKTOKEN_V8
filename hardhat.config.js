@@ -32,11 +32,13 @@ module.exports = {
     },
     bsc_testnet: {
       url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_API_KEY}/bsc/testnet`,
-      accounts: [`0x${process.env.PRIVATE_KEY}`]
+      accounts: [`0x${process.env.PRIVATE_KEY}`],
+      gasPrice: 9 * 1000000000
     },
     bsc_mainnet: {
       url: `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_API_KEY}/bsc/mainnet`,
-      accounts: [`0x${process.env.PRIVATE_KEY}`]
+      accounts: [`0x${process.env.PRIVATE_KEY}`],
+      gasPrice: 5 * 1000000000
     }
   },
   contractSizer: {
