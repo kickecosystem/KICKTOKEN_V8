@@ -10,12 +10,15 @@ describe("Token contract", function () {
   let addr1;
   let addr2;
   let addrs;
+  let maxSupply = 1.5 * 10**9;
+  let initSupply = 50 * 10**6;
+  let decimals = 10;
 
   beforeEach(async function () {
     Token = await ethers.getContractFactory("Token");
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-    kickToken = await Token.deploy("KickToken", "KICK", 10, 1.5 * 10**9, 50, 50);
+    kickToken = await Token.deploy("KickToken", "KICK", decimals, initSupply, maxSupply, 50, 50);
   });
 
   describe("Deployment", function () {
@@ -34,7 +37,7 @@ describe("Token contract", function () {
 
     it("Should set the right total supply of tokens", async function () {
       var totalSupply = await kickToken.totalSupply()
-      var expected = 1.5 * 10**10 * 10**9
+      var expected = initSupply * 10**10
       expect(totalSupply.toString()).to.equals(expected.toString());
     });
 
@@ -170,7 +173,7 @@ describe("Token contract", function () {
       const addr1Balance = await kickToken.balanceOf(addr1.address);
       expect(addr1Balance).to.equal(1800);
       const finalOwnerBalance = await kickToken.balanceOf(owner.address);
-      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1901));
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1901)); // round issue
       var totalSupply = await kickToken.totalSupply()
       expect(totalSupply).to.equal(initialTotalSupply.sub(100));
     });
@@ -184,7 +187,7 @@ describe("Token contract", function () {
       const addr1Balance = await kickToken.balanceOf(addr1.address);
       expect(addr1Balance).to.equal(50);
       const finalOwnerBalance = await kickToken.balanceOf(owner.address);
-      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(53)); // rounding  issue
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(53));  // round issue
       var totalSupply = await kickToken.totalSupply()
       expect(totalSupply).to.equal(initialTotalSupply.sub(2));
     });
@@ -210,7 +213,7 @@ describe("Token contract", function () {
       const addr1Balance = await kickToken.balanceOf(addr1.address);
       expect(addr1Balance).to.equal(1800);
       const ownerBalance = await kickToken.balanceOf(owner.address);
-      expect(ownerBalance).to.equal(initialOwnerBalance.sub(1901));  // rounding  issue
+      expect(ownerBalance).to.equal(initialOwnerBalance.sub(1901));  // round issue
       var totalSupply = await kickToken.totalSupply()
       expect(totalSupply).to.equal(initialTotalSupply.sub(100));
 
@@ -224,7 +227,7 @@ describe("Token contract", function () {
       const finalAddr2Balance = await kickToken.balanceOf(addr2.address);
       expect(finalAddr2Balance).to.equal(1620);
       const finalOwnerBalance = await kickToken.balanceOf(owner.address);
-      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1811));  // rounding  issue
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1811));  // round issue
       var finalSupply = await kickToken.totalSupply()
       expect(finalSupply).to.equal(initialTotalSupply.sub(190));
     });
@@ -238,7 +241,7 @@ describe("Token contract", function () {
       const addr1Balance = await kickToken.balanceOf(addr1.address);
       expect(addr1Balance).to.equal(1800);
       const ownerBalance = await kickToken.balanceOf(owner.address);
-      expect(ownerBalance).to.equal(initialOwnerBalance.sub(1901));  // rounding  issue
+      expect(ownerBalance).to.equal(initialOwnerBalance.sub(1901));  // round issue
       var totalSupply = await kickToken.totalSupply()
       expect(totalSupply).to.equal(initialTotalSupply.sub(100));
 
@@ -257,7 +260,7 @@ describe("Token contract", function () {
       const finalAddr2Balance = await kickToken.balanceOf(addr2.address);
       expect(finalAddr2Balance).to.equal(1620);
       const finalOwnerBalance = await kickToken.balanceOf(owner.address);
-      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1811));  // rounding  issue
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance.sub(1811));  // round issue
       var finalSupply = await kickToken.totalSupply()
       expect(finalSupply).to.equal(initialTotalSupply.sub(190));
     });
@@ -452,6 +455,57 @@ describe("Token contract", function () {
     });
   });
 
+  describe("Mint", function () {
+    it("Should mint tokens", async function () {
+      const initialBalance = await kickToken.balanceOf(addr1.address);
+      const ownerInitialBalance = await kickToken.balanceOf(owner.address);
+      var initialTotalSupply = await kickToken.totalSupply()
+
+      await kickToken.mint(addr1.address, 2000);
+      
+      const finalBalance = await kickToken.balanceOf(addr1.address);
+      expect(finalBalance).to.equal(initialBalance.add(2000));
+      const ownerFinalBalance = await kickToken.balanceOf(owner.address);
+      expect(ownerFinalBalance).to.equal(ownerInitialBalance);
+      var totalSupply = await kickToken.totalSupply()
+      expect(totalSupply).to.equal(initialTotalSupply.add(2000));
+    });
+
+    it("Should fail mint if sender doesn’t have permission", async function () {
+      const initialBalance = await kickToken.balanceOf(addr1.address);
+      var initialTotalSupply = await kickToken.totalSupply()
+
+      await expect(kickToken.connect(addr1).mint(addr1.address, 2000)).to.be.reverted;
+      
+      const finalBalance = await kickToken.balanceOf(addr1.address);
+      expect(finalBalance).to.equal(initialBalance);
+      var totalSupply = await kickToken.totalSupply()
+      expect(totalSupply).to.equal(initialTotalSupply);
+    });
+
+    it("Should mint max supply", async function () {
+      var amount = (maxSupply - initSupply) * 10**decimals;
+      await kickToken.mint(owner.address, amount.toString());
+      
+      const finalBalance = await kickToken.balanceOf(owner.address);
+      var expected = maxSupply * 10**decimals;
+      expect(finalBalance).to.equal(expected.toString());
+      var totalSupply = await kickToken.totalSupply()
+      expect(totalSupply).to.equal(expected.toString());
+    });
+
+    it("Should fail mint more than max supply", async function () {
+      var amount = (maxSupply - initSupply + 1) * 10**decimals
+      await expect(kickToken.mint(owner.address, amount.toString())).to.be.reverted;
+      
+      const finalBalance = await kickToken.balanceOf(owner.address);
+      var expected = initSupply * 10**decimals;
+      expect(finalBalance).to.equal(expected.toString());
+      var totalSupply = await kickToken.totalSupply()
+      expect(totalSupply).to.equal(expected.toString());
+    });
+  });
+
   describe("Distribute", function () {
     it("Should distibute own tokens", async function () {
       await kickToken.multisend([addr1.address],[1000]);
@@ -461,7 +515,7 @@ describe("Token contract", function () {
 
       await kickToken.connect(addr1).distribute(990);
       
-      expect(await kickToken.balanceOf(owner.address)).to.equal(initialOwnerBalance.add(989));
+      expect(await kickToken.balanceOf(owner.address)).to.equal(initialOwnerBalance.add(989));  // round issue
       expect(await kickToken.balanceOf(addr1.address)).to.equal(10);
     });
 
@@ -491,7 +545,7 @@ describe("Token contract", function () {
       expect(await kickToken.allowance(addr1.address, owner.address)).to.equal(1010);
       
       expect(await kickToken.balanceOf(addr1.address)).to.equal(10);
-      expect(await kickToken.balanceOf(owner.address)).to.equal(initialOwnerBalance.add(989));
+      expect(await kickToken.balanceOf(owner.address)).to.equal(initialOwnerBalance.add(989));  // round issue
     });
 
     it("Should fail distributeFrom if sender doesn’t have enough allowance", async function () {
@@ -602,7 +656,7 @@ describe("Token contract", function () {
 
   describe("Stuck funds", function () {
     it("Should transfer stuck funds from owner", async function () {
-      tokenERC20 = await Token.deploy("ERC20", "ERC20", 9, 1.5 * 10**9, 10, 10);
+      tokenERC20 = await Token.deploy("ERC20", "ERC20", 9, 1.5 * 10**9, 1.5 * 10**9, 10, 10);
       
       expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(0);
 
@@ -618,7 +672,7 @@ describe("Token contract", function () {
     });
 
     it("Should fail transfer stuck funds from not owner", async function () {
-      tokenERC20 = await Token.deploy("ERC20", "ERC20", 9, 1.5 * 10**9, 10, 10);
+      tokenERC20 = await Token.deploy("ERC20", "ERC20", 9, 1.5 * 10**9, 1.5 * 10**9, 10, 10);
       
       expect(await tokenERC20.balanceOf(kickToken.address)).to.equal(0);
 

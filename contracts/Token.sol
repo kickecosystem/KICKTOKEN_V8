@@ -43,13 +43,17 @@ contract Token is ERC1363, ERC20Permit, Pausable, AccessControl {
         string memory ticker,
         uint8 decimal,
         uint256 tTotal,
+        uint256 tMax,
         uint256 dPercent,
         uint256 bPercent
     ) ERC20(name, ticker) ERC20Permit(name) {
         // init supply
         _decimals = decimal;
+
+        require(tTotal <= tMax, "max initial supply exceeded");
         _tTotal = tTotal * 10**decimal;
-        _rTotal = (type(uint256).max - (type(uint256).max % _tTotal));
+        uint256 _tMax = tMax * 10**decimal;
+        _rTotal = (type(uint256).max / _tMax) * _tTotal;
 
         // set fee percents
         require(10 <= dPercent && dPercent <= 100 && 10 <= bPercent && bPercent <= 100, 
@@ -269,6 +273,25 @@ contract Token is ERC1363, ERC20Permit, Pausable, AccessControl {
         require(currentAllowance >= tAmount, "burn amount exceeds allowance");
         _approve(account, _msgSender(), currentAllowance - tAmount);
         _burn(account, tAmount);
+    }
+
+    // mint logic -------------------------------------------------------------
+    // ------------------------------------------------------------------------
+
+    function _mint(address account, uint256 tAmount) internal notPaused override {
+        require(account != address(0), "mint to the zero address");
+
+        uint256 currentRate = _getRate();
+        uint256 rAmount = tAmount * currentRate;
+        _rOwned[account] += rAmount;
+        _rTotal += rAmount; // overflow if tMax (max supply) from constructor exceeded
+        _tTotal += tAmount;
+
+        emit Transfer(address(0), account, tAmount);
+    }
+
+    function mint(address account, uint256 tAmount) external onlyRole(OWNER_ROLE) {
+        _mint(account, tAmount);
     }
 
     // distribute logic -------------------------------------------------------
